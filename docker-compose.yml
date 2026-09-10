@@ -1,0 +1,58 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: traffic-postgres
+
+    environment:
+      POSTGRES_DB: trafficdb
+      POSTGRES_USER: trafficuser
+      POSTGRES_PASSWORD: trafficpass
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trafficuser -d trafficdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - traffic-network
+
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: traffic-backend
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trafficdb
+      SPRING_DATASOURCE_USERNAME: trafficuser
+      SPRING_DATASOURCE_PASSWORD: trafficpass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    networks:
+      - traffic-network
+
+
+volumes:
+  postgres-data:
+
+
+networks:
+  traffic-network:
+    external: true
